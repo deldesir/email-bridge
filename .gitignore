@@ -1,0 +1,10 @@
+# Secrets & runtime state — never commit
+.env
+.last_uid
+*.bak*
+email_bridge.py.bak*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
