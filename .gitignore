@@ -8,3 +8,6 @@ email_bridge.py.bak*
 __pycache__/
 *.pyc
 .venv/
+
+# Inbound attachments (runtime)
+inbound/
