@@ -267,6 +267,31 @@ async def send(
     return Response(content=SENT_TOKEN, media_type="text/plain")
 
 
+@app.post("/send-json")
+async def send_json(payload: dict, authorization: str | None = Header(default=None)):
+    """JSON twin of /send for programmatic callers that cannot post a form (an
+    Uptime Kuma webhook with a custom body, a monitoring hook): a JSON object with
+    "to", "subject", "text" and optional "id". Same auth and SENT_TOKEN contract as
+    /send; trailing attachment URLs are not fetched, the text goes out as written."""
+    if SEND_AUTH and (authorization or "") != SEND_AUTH:
+        raise HTTPException(status_code=401, detail="unauthorized")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="json object expected")
+    raw_to = str(payload.get("to") or "")
+    to_addr = parseaddr(raw_to)[1] or raw_to.strip()
+    subj, body = _resolve_subject_body(payload.get("subject"), str(payload.get("text") or ""))
+    if not to_addr or not body.strip():
+        raise HTTPException(status_code=400, detail="missing to/text")
+    try:
+        await asyncio.to_thread(_send_smtp, to_addr, body[:MAX_BODY], subj)
+        log.info("sent email to %s (msg %s, %d chars, json)",
+                 to_addr, payload.get("id", ""), len(body))
+    except Exception as e:
+        log.error("SMTP send failed for %s: %s", to_addr, e)
+        raise HTTPException(status_code=502, detail=f"smtp error: {e}")
+    return Response(content=SENT_TOKEN, media_type="text/plain")
+
+
 @app.post("/send-file")
 async def send_file(
     to: str = Form(""),
